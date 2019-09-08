@@ -25,22 +25,30 @@
 -module(samovar).
 -author("Eric Pailleau <samovar@crownedgrouse.com>").
 
+-ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-endif.
 
-%-export([parse/1,simple_range/1, parse_range/1]).
+%-export([simple_range/1, parse_range/1]).
 -export([check/2]).
+-export([parse/1]).
 -export([versionize/1]).
+-export([version/0]).
 
 %% semver regex
 -define(SEMVER, "(\\*|x|[^0-9]{0,})([0-9\\*x]+){0,1}(\.[0-9\\*x]+){0,1}(\\.[0-9x]+){0,1}(\\-.*){0,}").
 
-%% semver record
--record(version, { comp = "="
-                 , major
-                 , minor
-                 , patch
-                 , pre
-                 }).
+-include("samovar.hrl").
+
+-opaque version() :: #version{}.
+
+-export_type([version/0]).
+
+%%-------------------------------------------------------------------------
+%% @doc  Export version type
+%% @end
+%%-------------------------------------------------------------------------
+version() -> #version{}.
 
 %%-------------------------------------------------------------------------
 %% @doc  Check a version against a semver range
@@ -153,16 +161,11 @@ versionize(V)  ->
       $~  -> [Pref] ++ versionize(Tail);
       _   -> V
    end.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%                            Local functions                              %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%-------------------------------------------------------------------------
 %% @doc  Parse semver string
 %% @end
 %%-------------------------------------------------------------------------
--spec parse(list()) -> {ok, tuple()} | {error, atom()}.
+-spec parse(string()) -> {ok, tuple()} | {error, atom()}.
 
 parse(V) when is_list(V) ->
   try
@@ -177,7 +180,7 @@ parse(V) when is_list(V) ->
                                        {"", "", "", "", ""}
                                 end,
                             {Comp, Major, Minor, Patch, Pre} = C,
-                            {ok, #version{comp = Comp, major = Major, minor = Minor, patch = Patch, pre = Pre}};
+                            {ok, #version{comp = Comp, major = Major, minor = Minor, patch = Patch, suffix = Pre}};
        match             -> throw(match); % Should never happen !
        nomatch           -> throw(nomatch);
        {error, ErrType}  -> throw(ErrType)
@@ -185,6 +188,11 @@ parse(V) when is_list(V) ->
   catch
       _:_ -> {error, invalid_version}
   end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%                            Local functions                              %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 %%-------------------------------------------------------------------------
 %% @doc  Extract simple range
@@ -446,6 +454,8 @@ safe_list_to_integer(L) -> erlang:list_to_integer(L).
 %%%                               TESTS                                     %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 
+-ifdef(TEST).
+
 parse_test() ->
   ?assertEqual({ok,{version, [], "16", "2", "3", "1"}}, parse("R16B03-1"))
   ,?assertEqual({ok,{version, [], "16", "2", "2", ""}}, parse("R16B02"))
@@ -506,3 +516,5 @@ check_test() ->
    ,?assertEqual(true,  check("R16B03-1",">R16B  <=17.1"))
    ,?assertEqual(true,  check("R16B03-1",">=R16B03  <=17.1"))
    ,ok.
+
+-endif.
