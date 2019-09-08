@@ -70,7 +70,9 @@ Note : this function is returning the input if no old Erlang/OTP release version
      {major,"14"},
      {minor,"5"},
      {patch,"8"},
-     {suffix,"rc1"}]}
+     {suffix,"rc1"},
+     {pre,"rc1"},
+     {build,[]}]}
 ```
 
 Note : as `samovar` is intend to be usable on any Erlang/OTP release, map is not proposed as output format.
@@ -78,8 +80,8 @@ However proplist can easily be converted to map with :
 ```erlang
 1> {ok, P} = samovar:proplist("14.5.8-rc1"),
 2> M = maps:from_list(P).   
-#{comp => [],major => "14",minor => "5",patch => "8",
-  suffix => "rc1"}
+#{build => [],comp => [],major => "14",minor => "5",
+  patch => "8",pre => "rc1",suffix => "rc1"}
 ```
 
 ### Parse a semver version and get a record
