@@ -32,11 +32,13 @@
 %-export([simple_range/1, parse_range/1]).
 -export([check/2]).
 -export([parse/1]).
+-export([proplist/1]).
 -export([versionize/1]).
+-export([major/1, minor/1, patch/1, suffix/1, prerelease/1, build/1]).
 -export([version/0]).
 
 %% semver regex
--define(SEMVER, "(\\*|x|[^0-9]{0,})([0-9\\*x]+){0,1}(\.[0-9\\*x]+){0,1}(\\.[0-9x]+){0,1}(\\-.*){0,}").
+-define(SEMVER, "(\\*|x|[^0-9]{0,})([0-9\\*x]+){0,1}(\.[0-9\\*x]+){0,1}(\\.[0-9x]+){0,1}([\\-|\\+].*){0,}").
 
 -include("samovar.hrl").
 
@@ -175,12 +177,20 @@ parse(V) when is_list(V) ->
                                  [[Co, Maj]]              -> {Co, Maj, "", "", ""};
                                  [[Co, Maj, Min]]         -> {Co, Maj, supdot(Min), "", ""};
                                  [[Co, Maj, Min, Pat]]    -> {Co, Maj, supdot(Min), supdot(Pat), ""};
-                                 [[Co, Maj, Min, Pat, P]] -> {Co, Maj, supdot(Min), supdot(Pat), supdash(P)};
+                                 [[Co, Maj, Min, Pat, P]] -> {Co, Maj, supdot(Min), supdot(Pat), P};
                                  _  -> throw({parse_error, Captured}),
                                        {"", "", "", "", ""}
                                 end,
-                            {Comp, Major, Minor, Patch, Pre} = C,
-                            {ok, #version{comp = Comp, major = Major, minor = Minor, patch = Patch, suffix = Pre}};
+                            {Comp, Major, Minor, Patch, Suffix_} = C,
+                            {Suffix, Pre, Build} = split_suffix(Suffix_),
+                            {ok, #version{comp = Comp
+                                         , major = Major
+                                         , minor = Minor
+                                         , patch = Patch
+                                         , suffix = Suffix
+                                         , pre = Pre
+                                         , build = Build
+                                         }};
        match             -> throw(match); % Should never happen !
        nomatch           -> throw(nomatch);
        {error, ErrType}  -> throw(ErrType)
@@ -189,6 +199,76 @@ parse(V) when is_list(V) ->
       _:_ -> {error, invalid_version}
   end.
 
+%%-------------------------------------------------------------------------
+%% @doc  Get a version in proplist elements
+%% @end
+%%-------------------------------------------------------------------------
+-spec proplist(string()) -> {ok, list()} | {error, atom()}.
+
+proplist(V) 
+  when is_list(V)
+  -> 
+    case parse(V) of
+      {error, X} -> {error, X};
+      {ok, R} when is_record(R, version) 
+              -> {ok, record_to_proplist(R)}
+    end.
+
+%%-------------------------------------------------------------------------
+%% @doc  Get major
+%% @end
+%%-------------------------------------------------------------------------
+major(V) -> 
+  case parse(V) of
+    {ok, R} -> safe_list_to_integer(R#version.major);
+    E -> E
+  end.
+%%-------------------------------------------------------------------------
+%% @doc  Get minor
+%% @end
+%%-------------------------------------------------------------------------
+minor(V) ->
+  case parse(V) of
+    {ok, R} -> safe_list_to_integer(R#version.minor);
+    E -> E
+  end.
+%%-------------------------------------------------------------------------
+%% @doc  Get patch
+%% @end
+%%-------------------------------------------------------------------------
+patch(V) ->
+  case parse(V) of
+    {ok, R} -> safe_list_to_integer(R#version.patch);
+    E -> E
+  end.
+%%-------------------------------------------------------------------------
+%% @doc  Get suffix
+%% @end
+%%-------------------------------------------------------------------------
+suffix(V) ->
+  case parse(V) of
+    {ok, R} -> R#version.suffix;
+    E -> E
+  end.
+%%-------------------------------------------------------------------------
+%% @doc  Get prerelease
+%% @end
+%%-------------------------------------------------------------------------
+prerelease(V) ->
+  case parse(V) of
+    {ok, R} -> R#version.pre;
+    E -> E
+  end.
+%%-------------------------------------------------------------------------
+%% @doc  Get buildmetadata
+%% @end
+%%-------------------------------------------------------------------------
+build(V) ->   
+  case parse(V) of
+    {ok, R} -> R#version.build;
+    E -> E
+  end.
+  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%                            Local functions                              %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -397,9 +477,9 @@ supdot(S) -> supchar(S, $.).
 %% @doc Remove first dash
 %% @end
 %%-------------------------------------------------------------------------
--spec supdash(string()) -> string().
+%-spec supdash(string()) -> string().
 
-supdash(S) -> supchar(S, $-).
+%supdash(S) -> supchar(S, $-).
 
 %%-------------------------------------------------------------------------
 %% @doc Remove first given char
@@ -449,6 +529,40 @@ join_prepend(Sep, [H|T]) -> [Sep,H|join_prepend(Sep,T)].
 safe_list_to_integer([]) -> safe_list_to_integer("0");
 safe_list_to_integer(L) -> erlang:list_to_integer(L).
 
+%%-------------------------------------------------------------------------
+%% @doc Convert version record to proplist
+%% @end
+%%-------------------------------------------------------------------------
+record_to_proplist(#version{} = Rec) ->
+  lists:zip(record_info(fields, version), tl(tuple_to_list(Rec))).
+
+%%-------------------------------------------------------------------------
+%% @doc Split version suffix
+%% @end
+%%-------------------------------------------------------------------------
+split_suffix(S)
+  when is_list(S)
+  -> 
+  Suff =
+    case S of
+      [$- | S1] -> S1 ;
+      [$+ | S2] -> S2 ;
+      S3 -> S3
+    end,
+  L  = lists:filter(fun(X) -> case X of [] -> false ; _ -> true end end,
+                    re:split(S,"([\+\-])",[{return,list}])),
+  Pre = case L of
+          ["-", Pre1 | _] -> Pre1 ;
+          ["+", _] -> [] ;
+          _ -> []
+        end,
+  Build = case L of
+          ["-", _, "+", Build1] -> Build1 ;
+          ["+", Build2] -> Build2 ;
+          _ -> []
+        end,
+  {Suff, Pre, Build}.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%                               TESTS                                     %%%
@@ -457,9 +571,9 @@ safe_list_to_integer(L) -> erlang:list_to_integer(L).
 -ifdef(TEST).
 
 parse_test() ->
-  ?assertEqual({ok,{version, [], "16", "2", "3", "1"}}, parse("R16B03-1"))
-  ,?assertEqual({ok,{version, [], "16", "2", "2", ""}}, parse("R16B02"))
-  ,?assertEqual({ok,{version, [], "16", "2", "", ""}}, parse("R16B"))
+  ?assertEqual({ok,{version, [], "16", "2", "3", "1", "1", []}}, parse("R16B03-1"))
+  ,?assertEqual({ok,{version, [], "16", "2", "2", "", "", ""}}, parse("R16B02"))
+  ,?assertEqual({ok,{version, [], "16", "2", "", "", "", ""}}, parse("R16B"))
   .
 
 parse_range_test() ->
@@ -516,5 +630,14 @@ check_test() ->
    ,?assertEqual(true,  check("R16B03-1",">R16B  <=17.1"))
    ,?assertEqual(true,  check("R16B03-1",">=R16B03  <=17.1"))
    ,ok.
+
+misc_test() ->    
+     ?assertEqual(17,  major("17.8.9-rc1+build001"))
+    ,?assertEqual( 8,  minor("17.8.9-rc1+build001"))
+    ,?assertEqual( 9,  patch("17.8.9-rc1+build001"))
+    ,?assertEqual("rc1+build001",  suffix("17.8.9-rc1+build001"))
+    ,?assertEqual("rc1",           prerelease("17.8.9-rc1+build001"))
+    ,?assertEqual("build001",      build("17.8.9-rc1+build001"))
+    ,ok.
 
 -endif.
