@@ -4,6 +4,8 @@
 
 `samovar` is an Erlang library implementing [SEMVER](https://semver.org/) standard.
 
+Support for semver ranges is available.
+
 ## Syntax for old Erlang/OTP release
 
 Old Erlang/OTP releases version will be internally mapped to syntaxically correct SEMVER version, on the fly,
@@ -58,11 +60,33 @@ Note : this function is returning the input if no old Erlang/OTP release version
 
 ```
 
+### Parse a semver version and get a proplist
+
+`samovar:proplist(Version :: string()) ->  {ok, Proplist :: list()} | {error, Reason :: atom()}` 
+
+```erlang
+1> samovar:proplist("14.5.8-rc1").
+{ok,[{comp,[]},
+     {major,"14"},
+     {minor,"5"},
+     {patch,"8"},
+     {suffix,"rc1"}]}
+```
+
+Note : as `samovar` is intend to be usable on any Erlang/OTP release, map is not proposed as output format.
+However proplist can easily be converted to map with : 
+```erlang
+1> {ok, P} = samovar:proplist("14.5.8-rc1"),
+2> M = maps:from_list(P).   
+#{comp => [],major => "14",minor => "5",patch => "8",
+  suffix => "rc1"}
+```
+
 ### Parse a semver version and get a record
 
 `samovar:parse(Version :: string()) ->  {ok, Record :: tuple()} | {error, Reason :: atom()}` 
 
-This function allow to get a record with string version splitted into Major, Minor, Patch and Pre-release elements.
+This function allow to get a record with string version splitted into Major, Minor, Patch and Suffix elements.
 
 Elements are still strings. See next functions for integer format.
 
