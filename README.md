@@ -17,13 +17,13 @@
 true
 2> samovar:check("1.0.3", "1.0 - 1.1").
 true
-3> samovar:check("1.0.3", "\~1.0").
+3> samovar:check("1.0.3", "~1.0").
 true
-4> samovar:check("1.1.2", "\~1.0").
+4> samovar:check("1.1.2", "~1.0").
 false
 5> samovar:check("1.3", "<=1.2 || >1.4").
 false
-6> samovar:check("foo", "\~1.2").
+6> samovar:check("foo", "~1.2").
 {error, invalid_version}
 7> samovar:check("1.2", "foobar").
 {error, invalid_range}
