@@ -15,30 +15,30 @@ Implementation is Erlang/OTP friendly by allowing use of old version syntax.
  >1.2.3
  <1.2.3
  >=1.2.3
- ~1.2.3 	is >=1.2.3 <1.3.0 	 
- ^1.2.3 	is >=1.2.3 <2.0.0 	 
- ^0.2.3 	is >=0.2.3 <0.3.0 	(0.x.x is special)
- ^0.0.1 	is =0.0.1 	     (0.0.x is special)
-  0.x.x 	is for “initial development”
-  1.x.x 	means public API is defined
- ^1.2 	  is >=1.2.0 <2.0.0 	(like ^1.2.0)
- ~1.2 	  is >=1.2.0 <1.3.0 	(like ~1.2.0)
- ^1 	    is >=1.0.0 <2.0.0 	 
- ~1 	    is >=1.0.0 <2.0.0 	 
- 1.x 	    is >=1.0.0 <2.0.0 	 
- 1.* 	    is >=1.0.0 <2.0.0 	 
- 1 	      is >=1.0.0 <2.0.0 	 
- * 	      any version 	 
- x 	      any version
+ ~1.2.3   is >=1.2.3 <1.3.0 	 
+ ^1.2.3   is >=1.2.3 <2.0.0 	 
+ ^0.2.3   is >=0.2.3 <0.3.0   (0.x.x is special)
+ ^0.0.1   is =0.0.1           (0.0.x is special)
+  0.x.x   is for “initial development”
+  1.x.x   means public API is defined
+ ^1.2     is >=1.2.0 <2.0.0 	(like ^1.2.0)
+ ~1.2     is >=1.2.0 <1.3.0 	(like ~1.2.0)
+ ^1       is >=1.0.0 <2.0.0 	 
+ ~1       is >=1.0.0 <2.0.0 	 
+ 1.x      is >=1.0.0 <2.0.0 	 
+ 1.*      is >=1.0.0 <2.0.0 	 
+ 1        is >=1.0.0 <2.0.0 	 
+ *        any version 	 
+ x        any version
 ```
 
 ### Hyphenated range
 ```
-1.2.3 - 2.3.0 	is >=1.2.3 <=2.3.4
+1.2.3 - 2.3.0   is >=1.2.3 <=2.3.4
                 Partial right
                 When the right is partial, missing pieces are assumed to be x (2.3 = 2.3.x).
-1.2.3 - 2.3 	  is >=1.2.3 <2.4.0
-1.2.3 - 2 	    is >=1.2.3 <3.0.0
+1.2.3 - 2.3     is >=1.2.3 <2.4.0
+1.2.3 - 2       is >=1.2.3 <3.0.0
                 Partial left
                 When the left is partial, missing pieces are assumed to be 0 (eg, 1.2.0).
 1.2 - 2.3.0 	is 1.2.0 - 2.3.0
@@ -46,8 +46,8 @@ Implementation is Erlang/OTP friendly by allowing use of old version syntax.
 
 ### Combining range
 ```
->=0.14 <16 	      And (space-separated)
-0.14.x || 15.x.x 	Or (pipe-separated)
+>=0.14 <16        And (space-separated)
+0.14.x || 15.x.x  Or (pipe-separated)
 ```
 
 ## Syntax for old Erlang/OTP release
