@@ -25,11 +25,11 @@ Implementation is Erlang/OTP friendly by allowing use of old version syntax.
  ~1.2     is >=1.2.0 <1.3.0 	(like ~1.2.0)
  ^1       is >=1.0.0 <2.0.0 	 
  ~1       is >=1.0.0 <2.0.0 	 
- 1.x      is >=1.0.0 <2.0.0 	 
- 1.*      is >=1.0.0 <2.0.0 	 
- 1        is >=1.0.0 <2.0.0 	 
- *        any version 	 
- x        any version
+  1.x     is >=1.0.0 <2.0.0 	 
+  1.*     is >=1.0.0 <2.0.0 	 
+  1       is >=1.0.0 <2.0.0 	 
+  *       any version 	 
+  x       any version
 ```
 
 ### Hyphenated range
