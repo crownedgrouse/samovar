@@ -14,7 +14,7 @@ Implementation is Erlang/OTP friendly by allowing use of old version syntax.
  =1.2.3
  >1.2.3
  <1.2.3
- >=1.2.3
+>=1.2.3
  ~1.2.3   is >=1.2.3 <1.3.0 	 
  ^1.2.3   is >=1.2.3 <2.0.0 	 
  ^0.2.3   is >=0.2.3 <0.3.0   (0.x.x is special)
