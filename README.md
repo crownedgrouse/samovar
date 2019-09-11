@@ -4,7 +4,7 @@
 
 `samovar` is an Erlang library implementing [SEMVER](https://semver.org/) standard.
 
-Implementation is Erlang/OTP friendly by allowing use of old version syntax.
+Implementation is Erlang/OTP friendly by allowing use of old release version syntax.
 
 ## Supported syntaxes
 
