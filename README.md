@@ -61,10 +61,11 @@ This imply that `true = samovar:check("R16B03-1", ">R16B <21.2")` will be correc
 
 ## API
 
-
 ### Check a version vs a semver range
 
-`samovar:check(Version :: string(), Range :: string()) -> boolean() || {error, Reason :: atom()}.`
+```erlang
+samovar:check(Version :: string(), Range :: string()) -> boolean() || {error, Reason :: atom()}.
+```
 
 ```erlang
 
@@ -87,7 +88,9 @@ false
 
 ### Semversionize an Erlang/OTP release
 
-`samovar:versionize(OTPVersion :: string()) -> SemverVersion :: string().` 
+```erlang
+samovar:versionize(OTPVersion :: string()) -> SemverVersion :: string().
+``` 
 
 This function is internally used by `samovar` for old Erlang/OTP release version transcodification.
 This function is however exported for users.
@@ -106,7 +109,9 @@ Note : this function is returning the input if no old Erlang/OTP release version
 
 ### Parse a semver version and get a proplist
 
-`samovar:proplist(Version :: string()) ->  {ok, Proplist :: list()} | {error, Reason :: atom()}` 
+```erlang
+samovar:proplist(Version :: string()) ->  {ok, Proplist :: list()} | {error, Reason :: atom()}.
+``` 
 
 ```erlang
 1> samovar:proplist("14.5.8-rc1").
@@ -130,7 +135,9 @@ However proplist can easily be converted to map with :
 
 ### Parse a semver version and get a record
 
-`samovar:parse(Version :: string()) ->  {ok, Record :: tuple()} | {error, Reason :: atom()}` 
+```erlang
+samovar:parse(Version :: string()) ->  {ok, Record :: tuple()} | {error, Reason :: atom()}.
+``` 
 
 This function allow to get a record with string version splitted into Major, Minor, Patch and Suffix elements.
 
