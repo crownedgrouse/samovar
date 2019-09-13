@@ -64,7 +64,7 @@ This imply that `true = samovar:check("R16B03-1", ">R16B <21.2")` will be correc
 ### Check a version vs a semver range
 
 ```erlang
-samovar:check(Version :: string(), Range :: string()) -> boolean() || {error, Reason :: atom()}.
+samovar:check(Version :: string(), Range :: string()) -> boolean() | {error, Reason :: atom()}.
 ```
 
 ```erlang
@@ -148,12 +148,12 @@ Elements are still strings. See next functions for integer format.
 [version]
 2> {ok, V} = samovar:parse("14.5.8-rc1").
 {ok,#version{comp = [],major = "14",minor = "5",patch = "8",
-             suffix = "rc1"}}
+             suffix = "rc1",pre = "rc1",build = []}}
 3>  V#version.major . 
 "14"
 4> {ok, X} = samovar:parse("~14.5").
 {ok,#version{comp = "~",major = "14",minor = "5",patch = [],
-             suffix = []}}
+             suffix = [],pre = [],build = []}}
 ```
 
 ### Get individual elements of version string

@@ -1,0 +1,16 @@
+{application, samovar,
+ [
+  {description, "SEMVER library for Erlang"},
+  {vsn, "1.0.0"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []},
+  {modules, []},
+  {pkg_name,"samovar"},
+  {licenses,["ISC"]},
+  {links,[{"Github","https://github.com/crownedgrouse/samovar"},
+          {"Wiki","https://github.com/crownedgrouse/samovar/wiki"}]}
+ ]}.

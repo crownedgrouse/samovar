@@ -1,6 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% File:      samovar.erl
-%%% @author    Eric Pailleau <geas@crownedgrouse.com>
+%%% @author    Eric Pailleau <samovar@crownedgrouse.com>
 %%% @copyright 2019 crownedgrouse.com
 %%% @doc
 %%%     semver library for Erlang
@@ -25,11 +25,13 @@
 -module(samovar).
 -author("Eric Pailleau <samovar@crownedgrouse.com>").
 
+-dialyzer([{nowarn_function, [strip_range/1]}]).
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
-%-export([simple_range/1, parse_range/1]).
+-export([simple_range/1, parse_range/1]).
 -export([check/2]).
 -export([parse/1]).
 -export([proplist/1]).
@@ -50,6 +52,8 @@
 %% @doc  Export version type
 %% @end
 %%-------------------------------------------------------------------------
+-spec version() -> version().
+
 version() -> #version{}.
 
 %%-------------------------------------------------------------------------
@@ -67,6 +71,7 @@ check(Version, Range)
           {error, Reason1} -> throw(Reason1)
         end,
       R = parse_range(Range),
+      %erlang:display({L, R}),
       check(L, R)
     catch 
       _:Reason -> {error, Reason}
@@ -97,25 +102,31 @@ check(Version, Comp, Major, Minor, Patche)
    when is_record(Version, version), is_list(Comp), is_list(Major), is_list(Minor), is_list(Patche) ->
 
    C = case (Version#version.major == Major) of
-        false -> case (safe_list_to_integer(Version#version.major) > safe_list_to_integer(Major)) of
-                     true  -> ">" ;
-                     false -> "<"
-                 end;
-        true   -> case (Version#version.minor == Minor) of
-                     false -> case (safe_list_to_integer(Version#version.minor) > safe_list_to_integer(Minor)) of
-                                    true  -> ">" ;
-                                    false -> "<"
-                              end;
-                     true  -> case ((Version#version.patch == Patche)
-                                    or 
-                                    (Version#version.patch == []) and (Patche == "0")) of
-                                 true  -> "=" ;
-                                 false -> case (safe_list_to_integer(Version#version.patch) > safe_list_to_integer(Patche)) of
-                                                true  -> ">" ;
-                                                false -> "<"
-                                          end
-                              end
-                 end
+        false -> 
+          case (safe_list_to_integer(Version#version.major) > safe_list_to_integer(Major)) of
+             true  -> ">" ;
+             false -> "<"
+          end;
+        true   -> 
+          case ((Version#version.minor == Minor)
+                  or 
+               (Version#version.minor == []) and (Minor == "0")) of
+                   false -> 
+                    case (safe_list_to_integer(Version#version.minor) > safe_list_to_integer(Minor)) of
+                          true  -> ">" ;
+                          false -> "<"
+                    end;
+                   true  -> 
+                      case ((Version#version.patch == Patche)
+                            or 
+                            (Version#version.patch == []) and (Patche == "0")) of
+                         true  -> "=" ;
+                         false -> case (safe_list_to_integer(Version#version.patch) > safe_list_to_integer(Patche)) of
+                                        true  -> ">" ;
+                                        false -> "<"
+                                  end
+                      end
+         end
       end,
    case Comp of
         "="  when (C == "=") -> true ;
@@ -174,6 +185,8 @@ parse(V) when is_list(V) ->
     case re:run(versionize(V), ?SEMVER, [global, {capture, all_but_first, list}, notempty]) of
        {match, Captured} -> C = case Captured of
                                  [["*",[],[]],[[],[],[]]] -> {"*", "", "", "", ""};
+                                 [["*"]]                  -> {"*", "", "", "", ""};
+                                 [["x"]]                  -> {"x", "", "", "", ""};
                                  [[Co, Maj]]              -> {Co, Maj, "", "", ""};
                                  [[Co, Maj, Min]]         -> {Co, Maj, supdot(Min), "", ""};
                                  [[Co, Maj, Min, Pat]]    -> {Co, Maj, supdot(Min), supdot(Pat), ""};
@@ -196,7 +209,8 @@ parse(V) when is_list(V) ->
        {error, ErrType}  -> throw(ErrType)
     end
   catch
-      _:_ -> {error, invalid_version}
+      _:_E -> %erlang:display(_E),
+        {error, invalid_version}
   end.
 
 %%-------------------------------------------------------------------------
@@ -280,61 +294,66 @@ build(V) ->
 %%-------------------------------------------------------------------------
 -spec simple_range(list()) -> tuple().
 
-simple_range(X) ->
+simple_range(X) -> 
    case catch parse(X) of
-      {error, E} -> {error, E};
-      {ok, M}    -> simple_range_translate(M)
+      {error, E} -> 
+        {error, E};
+      {ok, M}    -> 
+        strip_range(simple_range_translate(M))
    end.
 
 %%-------------------------------------------------------------------------
 %% @doc Translate simple range
 %% @end
 %%-------------------------------------------------------------------------
--spec simple_range_translate(tuple()) -> {ok, tuple(), tuple()} | {error, atom()}.
+-spec simple_range_translate(tuple()) -> {ok, tuple() | atom(), tuple() | atom()} | {error, atom()}.
 
-simple_range_translate(X) when is_record(X, version) ->
+simple_range_translate(X) 
+   when is_record(X, version) -> 
    simple_range_translate(X, X#version.comp).
 
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, C)
-   when (Major == "") ->
+   when (Major == "") -> 
    simple_range_translate(#version{major = "0", minor = Minor, patch = Patch}, C);
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, C)
-   when (Major =/= ""),(Minor == "") ->
+   when (Major =/= ""),(Minor == "") -> 
    simple_range_translate(#version{major = Major, minor = "0", patch = Patch}, C);
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, C)
-   when (Major =/= ""),(Minor =/= ""),(Patch == "") ->
+   when (Major =/= ""),(Minor =/= ""),(Patch == "") -> 
    simple_range_translate(#version{major = Major, minor = Minor, patch = "0"}, C);
 simple_range_translate(#version{major = Major, minor = _Minor, patch = _Patch}, _)
-   when (Major == "x") ->
+   when (Major == "x");(Major == "*") -> 
    simple_range_translate(#version{major = "0", minor = "0", patch = "0"}, ">=");
 simple_range_translate(#version{major = Major, minor = Minor, patch = _Patch}, _)
-   when (Minor == "x") ->
+   when (Minor == "x");(Minor == "*") -> 
    parse_range(io_lib:format(">=~ts.0.0 <~ts.0.0", [Major, erlang:integer_to_list(erlang:list_to_integer(Major) + 1)]));
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, _)
-   when (Patch == "x") ->
+   when (Patch == "x");(Patch == "*") -> 
    parse_range(io_lib:format(">=~ts.~ts.0 <~ts.~ts.0", [Major, Minor, Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1)]));
 % ~ 	means “reasonably close to”
 % ~1.2.3 	is >=1.2.3 <1.3.0
 % ~1.2 	   is >=1.2.0 <1.3.0 	(like ~1.2.0)
-% ~1 	      same
+% ~1 	     
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "\~")
-   when (Major =/= ""),(Minor =/= ""),(Patch =/= "") ->
+   when (Major =/= ""),(Minor =/= ""),(Minor =/= "0"),(Patch =/= ""),(Patch =/= "0") -> 
    Min = {">=", Major, Minor, Patch},
    Max = {"<", Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1), "0"},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = Minor}, "\~")
-   when (Major =/= ""),(Minor =/= "") ->
+   when (Major =/= ""),(Minor =/= ""),(Minor =/= "0") ->
    Min = {">=",Major, Minor, "0"},
    Max = {"<", Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1), "0"},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major}, "\~")
-   when (Major =/= "") ->
-   Min = {"=", Major},
-   Max = {"=", Major},
+   when (Major =/= "") -> 
+   Min = {">=",Major, "0", "0"},
+   Max = {"<", erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"},
    {ok, Min, Max};
 % * 	      any version
 simple_range_translate(#version{major = _Major, minor = _Minor, patch = _Patch}, "*")
-   -> {ok, lowest, highest};
+   -> {ok, {">=", lowest}, {"<=", highest}};
+simple_range_translate(#version{major = _Major, minor = _Minor, patch = _Patch}, "x")
+   -> {ok, {">=", lowest}, {"<=", highest}};
 
 % ^ 	means “compatible with”
 % ^1.2.3 	is >=1.2.3 <2.0.0
@@ -343,53 +362,58 @@ simple_range_translate(#version{major = _Major, minor = _Minor, patch = _Patch},
 % ^1.2 	   is >=1.2.0 <2.0.0 	(like ^1.2.0)
 % ^1 	      is >=1.0.0 <2.0.0
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "^")
-   when (Major =/= ""),(Major =/= "0"),(Minor =/= ""),(Patch =/= "") ->
+   when (Major =/= ""),(Major =/= "0"),(Minor =/= ""),(Patch =/= "") -> 
    Min = {">=", Major, Minor, Patch},
    Max = {"<", erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "^")
-   when (Major =/= ""),(Major == "0"),(Minor =/= ""),(Minor =/= "0"),(Patch =/= "") ->
+   when (Major =/= ""),(Major == "0"),(Minor =/= ""),(Minor =/= "0"),(Patch =/= "") -> 
    Min = {">=", Major, Minor, Patch},
    Max = {"<", Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1), "0"},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "^")
-   when (Major =/= ""),(Major == "0"),(Minor =/= ""),(Minor == "0"),(Patch =/= "") ->
+   when (Major =/= ""),(Major == "0"),(Minor =/= ""),(Minor == "0"),(Patch =/= "") -> 
    Min = {"=", Major, Minor, Patch},
    Max = {"=", Major, Minor, Patch},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "^")
-   when (Major =/= ""),(Minor =/= ""),(Patch == "") ->
+   when (Major =/= ""),(Minor =/= ""),(Patch == "") -> 
    Min = {">=", Major, Minor, "0"},
    Max = {"<", erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major}, "^")
-   when (Major =/= "") ->
+   when (Major =/= "") -> 
    Min = {">=", Major, "0", "0"},
    Max = {"<", erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"},
    {ok, Min, Max};
 %% = >= > <
+%simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "")
+%   when (Major =/= ""),(Major =/= "0"),(Minor =/= ""),(Patch =/= "") -> 
+%   Min = {"=", Major, Minor, Patch},
+%   Max = {"=", Major, Minor, Patch},
+%   {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "=")
-   when (Major =/= ""),(Major =/= "0"),(Minor =/= ""),(Patch =/= "") ->
+   when (Major =/= ""),(Major =/= "0"),(Minor =/= ""),(Patch =/= "") -> 
    Min = {"=", Major, Minor, Patch},
    Max = {"=", Major, Minor, Patch},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, ">=")
-   when (Major =/= ""),(Minor =/= ""),(Patch =/= "") ->
+   when (Major =/= ""),(Minor =/= ""),(Patch =/= "") -> 
    Min = {">=", Major, Minor, Patch},
    Max = {"<=", highest},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, ">")
-   when (Major =/= ""),(Minor =/= ""),(Patch =/= "") ->
+   when (Major =/= ""),(Minor =/= ""),(Patch =/= "") -> 
    Min = {">", Major, Minor, Patch},
    Max = {"<=", highest},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "<=")
-   when (Major =/= ""),(Minor =/= ""),(Patch =/= "") ->
+   when (Major =/= ""),(Minor =/= ""),(Patch =/= "") -> 
    Min = {">=",lowest},
    Max = {"<=", Major, Minor, Patch},
    {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "<")
-   when (Major =/= ""),(Minor =/= ""),(Patch =/= "") ->
+   when (Major =/= ""),(Minor =/= ""),(Patch =/= "") -> 
    Min = {">=",lowest},
    Max = {"<", Major, Minor, Patch},
    {ok, Min, Max};
@@ -397,20 +421,30 @@ simple_range_translate(#version{major = Major, minor = Minor, patch = Patch}, "<
 % 1.* 	   same
 % 1 	      same
 % x 	      same
-simple_range_translate(#version{major = Major, minor = Minor, patch = _Patch}, "")
-   when (Major =/= ""),(Minor =/= "") ->
-  Min = {"=", Major, Minor},
-  Max = {"=", Major, Minor},
-  {ok, Min, Max};
-simple_range_translate(#version{major = Major, minor = Minor, patch = _Patch}, "")
-   when (Major =/= ""),(Minor =/= "*") ->
-   Min = {"=", Major, Minor},
-   Max = {"=", Major, Minor},
-   {ok, Min, Max};
 simple_range_translate(#version{major = Major, minor = _Minor, patch = _Patch}, "")
-   when (Major =/= "") ->
-   Min = {"=", Major},
-   Max = {"=", Major},
+   when (Major == "*");(Major == "x") -> 
+   Min = {">=", lowest},
+   Max = {"<=", highest},
+   {ok, Min, Max};
+simple_range_translate(#version{major = Major, minor = Minor, patch = _Patch}, "")
+   when (Major =/= ""),((Minor == "x") or (Minor == "*")) -> 
+   Min = {">=", Major, "0", "0"},
+   Max = {"<", erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"},
+   {ok, Min, Max};
+simple_range_translate(#version{major = Major, minor = Minor, patch = _Patch}, "")
+   when (Major =/= ""),(Minor == "") -> 
+   Min = {">=", Major, "0", "0"},
+   Max = {"<", erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"},
+   {ok, Min, Max};
+simple_range_translate(#version{major = Major, minor = Minor, patch = _Patch}, "")
+   when (Major =/= ""),(Minor =/= ""),(Minor =/= "0") -> 
+   Min = {">=", Major, "0", "0"},
+   Max = {"<", Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1), "0"},
+   {ok, Min, Max};
+simple_range_translate(#version{major = Major, minor = Minor, patch = _Patch}, "")
+   when (Major =/= ""),(Minor =/= "") -> 
+   Min = {">=", Major, "0", "0"},
+   Max = {"<", erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"},
    {ok, Min, Max};
 simple_range_translate(_X, _Y)
    -> {error, invalid_range}.
@@ -433,12 +467,12 @@ simple_range_translate(_X, _Y)
 % 0.14.x || 15.x.x 	Or (pipe-separated)
 -spec parse_range(list()) -> tuple() | no_return().
 
-parse_range(V) when is_list(V) ->
+parse_range(V) when is_list(V) -> 
   try
    case string:tokens(V, " ") of
       [Left, "-", Right]  
-        -> {ok, #version{major = Major, minor = Minor, patch = Patch} = X} = parse(Right),
-           %io:format("parse_range : ~p~n",[X]),
+        -> 
+           {ok, #version{major = Major, minor = Minor, patch = Patch} = X} = parse(Right),
            case X of
                X when (Patch =/= "")
                   -> parse_range(io_lib:format(">=~ts <=~ts", [Left, Right]));
@@ -449,20 +483,25 @@ parse_range(V) when is_list(V) ->
                   -> parse_range(io_lib:format(">=~ts <~ts.~ts.~ts", [Left, Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1), "0"]))
 
            end ;
-      [Left, "||", Right] -> {ok, L1, R1} = strip_range(simple_range(Left)),
-                             {ok, L2, R2} = strip_range(simple_range(Right)),
-                             {'or', {'and', L1, R1}, {'and', L2, R2}};
-      [Left, "||" | Right] -> {ok, L1, R1} = strip_range(simple_range(Left)),
-                              R = parse_range(lists:flatten(join(" ", Right))),
-                              {'or', {'and', L1, R1}, R};
-      [Left, Right]       -> {ok, L1, R1} = strip_range(simple_range(Left)),
-                             {ok, L2, R2} = strip_range(simple_range(Right)),
-                             {'and', {'and', L1, R1}, {'and', L2, R2}};
-      [Single]            -> {ok, L1, R1} = strip_range(simple_range(Single)),
-                             {'and', L1, R1}
+      [Left, "||", Right] -> 
+          {ok, L1, R1} = simple_range(Left),
+          {ok, L2, R2} = simple_range(Right),
+          {'or', {'and', L1, R1}, {'and', L2, R2}};
+      [Left, "||" | Right] -> 
+          {ok, L1, R1} = simple_range(Left),
+          R = parse_range(lists:flatten(join(" ", Right))),
+          {'or', {'and', L1, R1}, R};
+      [Left, Right]       -> 
+          {ok, L1, R1} = simple_range(Left),
+          {ok, L2, R2} = simple_range(Right),
+          {'and', {'and', L1, R1}, {'and', L2, R2}};
+      [Single]            -> 
+          {ok, L1, R1} = simple_range(Single),
+          {'and', L1, R1}
    end
   catch 
-    _:_ -> throw(invalid_range)
+    _:_E ->  %erlang:display({error, _E}),
+      throw(invalid_range)
   end.
 
 %%-------------------------------------------------------------------------
@@ -491,16 +530,6 @@ supchar(S, C) -> case S of
                      [C | Rest] -> Rest ;
                      _ -> S
                  end.
-
-%%-------------------------------------------------------------------------
-%% @doc Strip range
-%% @end
-%%-------------------------------------------------------------------------
--spec strip_range(tuple()) -> tuple().
-
-strip_range({ok, L, R})    -> {ok, L, R};
-strip_range({'and', L, R}) -> {ok, L, R};
-strip_range(X) -> X.
 
 %%-------------------------------------------------------------------------
 %% @doc join function
@@ -563,6 +592,21 @@ split_suffix(S)
         end,
   {Suff, Pre, Build}.
 
+%%-------------------------------------------------------------------------
+%% @doc Strip range
+%% @end
+%%-------------------------------------------------------------------------
+-spec strip_range(tuple()) -> {ok, tuple() | atom(), tuple() | atom()} | {error, atom()}.
+
+strip_range({ok, L, R})    
+  -> %erlang:display({ok, L, R}), 
+  {ok, L, R};
+strip_range({'and', L, R}) 
+  -> %erlang:display({ok, L, R}), 
+  {ok, L, R};
+strip_range({'error', E}) 
+  -> %erlang:display({ok, L, R}), 
+  {'error', E}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%                               TESTS                                     %%%
@@ -571,7 +615,7 @@ split_suffix(S)
 -ifdef(TEST).
 
 parse_test() ->
-  ?assertEqual({ok,{version, [], "16", "2", "3", "1", "1", []}}, parse("R16B03-1"))
+   ?assertEqual({ok,{version, [], "16", "2", "3", "1","1",[]}}, parse("R16B03-1"))
   ,?assertEqual({ok,{version, [], "16", "2", "2", "", "", ""}}, parse("R16B02"))
   ,?assertEqual({ok,{version, [], "16", "2", "", "", "", ""}}, parse("R16B"))
   .
@@ -613,12 +657,175 @@ parse_range_test() ->
                  parse_range("<11 || >13 || 12.3.x"))
    ,ok.
 
+
 check_test() ->
+    %   1.2.3
+    ?assertEqual(true, check("1.2.3","1.2.3"))
+    %  =1.2.3
+   ,?assertEqual(true, check("1.2.3","=1.2.3"))
+   ,?assertEqual(false, check("1.2.4","=1.2.3"))
+   ,?assertEqual(false, check("1.3.2","=1.2.3"))
+   ,?assertEqual(false, check("3.2.1","=1.2.3"))
+    %  >1.2.3
+   ,?assertEqual(true, check("1.2.4",">1.2.3"))
+   ,?assertEqual(true, check("1.4.3",">1.2.3"))
+   ,?assertEqual(true, check("2.3.1",">1.2.3"))
+   ,?assertEqual(false, check("1.2.1",">1.2.3"))
+   ,?assertEqual(false, check("1.1.3",">1.2.3"))
+   ,?assertEqual(false, check("0.2.1",">1.2.3"))
+    %  <1.2.3
+   ,?assertEqual(true, check("1.2.2","<1.2.3"))
+   ,?assertEqual(true, check("1.1.3","<1.2.3"))
+   ,?assertEqual(true, check("0.2.3","<1.2.3"))
+   ,?assertEqual(false, check("1.2.4","<1.2.3"))
+   ,?assertEqual(false, check("1.3.2","<1.2.3"))
+   ,?assertEqual(false, check("2.2.1","<1.2.3"))
+    % >=1.2.3
+   ,?assertEqual(true, check("1.2.3",">=1.2.3"))
+   ,?assertEqual(true, check("1.2.4",">=1.2.3"))
+   ,?assertEqual(true, check("1.4.3",">=1.2.3"))
+   ,?assertEqual(true, check("2.3.1",">=1.2.3"))
+   ,?assertEqual(false, check("1.2.1",">=1.2.3"))
+   ,?assertEqual(false, check("1.1.3",">=1.2.3"))
+   ,?assertEqual(false, check("0.2.1",">=1.2.3"))
+    % <=1.2.3
+   ,?assertEqual(true, check("1.2.3","<=1.2.3"))
+   ,?assertEqual(true, check("1.2.2","<=1.2.3"))
+   ,?assertEqual(true, check("1.1.3","<=1.2.3"))
+   ,?assertEqual(true, check("0.2.3","<=1.2.3"))
+   ,?assertEqual(false, check("1.2.4","<=1.2.3"))
+   ,?assertEqual(false, check("1.3.2","<=1.2.3"))
+   ,?assertEqual(false, check("2.3.1","<=1.2.3"))
+    %  ~1.2.3   is >=1.2.3 <1.3.0 
+   ,?assertEqual(true, check("1.2.3","~1.2.3"))
+   ,?assertEqual(true, check("1.2.4","~1.2.3"))
+   ,?assertEqual(true, check("1.2.30","~1.2.3"))
+   ,?assertEqual(false, check("1.3.0","~1.2.3"))
+   ,?assertEqual(false, check("1.4.3","~1.2.3"))
+   ,?assertEqual(false, check("2.2.3","~1.2.3"))
+    %  ^1.2.3   is >=1.2.3 <2.0.0 
+   ,?assertEqual(true, check("1.2.3","^1.2.3"))
+   ,?assertEqual(true, check("1.2.4","^1.2.3"))
+   ,?assertEqual(true, check("1.3.3","^1.2.3"))
+   ,?assertEqual(true, check("1.100.3","^1.2.3"))
+   ,?assertEqual(false, check("2.0.0","^1.2.3"))
+   ,?assertEqual(false, check("2.2.3","^1.2.3"))
+    %  ^0.2.3   is >=0.2.3 <0.3.0   (0.x.x is special)
+   ,?assertEqual(true, check("0.2.3","^0.2.3"))
+   ,?assertEqual(true, check("0.2.4","^0.2.3"))
+   ,?assertEqual(true, check("0.2.50","^0.2.3"))
+   ,?assertEqual(false, check("0.3.0","^0.2.3"))
+   ,?assertEqual(false, check("0.3.1","^0.2.3"))
+   ,?assertEqual(false, check("1.0.0","^0.2.3"))
+   ,?assertEqual(false, check("1.1.0","^0.2.3"))
+   ,?assertEqual(false, check("1.1.1","^0.2.3"))
+    %  ^0.0.1   is =0.0.1           (0.0.x is special)
+   ,?assertEqual(true, check("0.0.1","^0.0.1"))
+   ,?assertEqual(false, check("0.0.2","^0.0.1"))
+   ,?assertEqual(false, check("0.0.50","^0.0.1"))
+   ,?assertEqual(false, check("0.1.1","^0.0.1"))
+   ,?assertEqual(false, check("1.0.1","^0.0.1"))
+   ,?assertEqual(false, check("1.1.1","^0.0.1"))
+    %   0.x.x   is for “initial development”
+   ,?assertEqual(true, check("0.1.0","0.x.x"))
+   ,?assertEqual(true, check("0.1.2","0.x.x"))
+   ,?assertEqual(true, check("0.2.1","0.x.x"))
+   ,?assertEqual(false, check("1.0.0","0.x.x"))
+   ,?assertEqual(false, check("1.1.0","0.x.x"))
+   ,?assertEqual(false, check("2.0.2","0.x.x"))
+    %   1.x.x   means public API is defined
+   ,?assertEqual(true, check("1.0.0","1.x.x"))
+   ,?assertEqual(true, check("1.0.2","1.x.x"))
+   ,?assertEqual(true, check("1.3.2","1.x.x"))
+    %  ^1.2     is >=1.2.0 <2.0.0   (like ^1.2.0)
+   ,?assertEqual(true, check("1.2","^1.2"))
+   ,?assertEqual(true, check("1.2.0","^1.2"))
+   ,?assertEqual(true, check("1.2.5","^1.2"))
+   ,?assertEqual(true, check("1.4.5","^1.2"))
+   ,?assertEqual(false, check("2.0.0","^1.2"))
+   ,?assertEqual(false, check("2.1.0","^1.2"))
+   ,?assertEqual(false, check("2.2.3","^1.2"))
+    %  ~1.2     is >=1.2.0 <1.3.0   (like ~1.2.0)
+   ,?assertEqual(true, check("1.2","~1.2"))
+   ,?assertEqual(true, check("1.2.0","~1.2"))
+   ,?assertEqual(true, check("1.2.3","~1.2"))
+   ,?assertEqual(true, check("1.2.50","~1.2"))
+   ,?assertEqual(false, check("1.3.0","~1.2"))
+   ,?assertEqual(false, check("1.3.5","~1.2"))
+   ,?assertEqual(false, check("2.0.0","~1.2"))
+   ,?assertEqual(false, check("2.1.0","~1.2"))
+   ,?assertEqual(false, check("2.0.2","~1.2"))
+   ,?assertEqual(false, check("2.2.2","~1.2"))
+    %  ^1       is >=1.0.0 <2.0.0
+   ,?assertEqual(true, check("1","^1"))
+   ,?assertEqual(true, check("1.0","^1"))
+   ,?assertEqual(true, check("1.0.0","^1"))
+   ,?assertEqual(false, check("0","^1"))
+   ,?assertEqual(false, check("0.1.0","^1"))
+   ,?assertEqual(false, check("0.0.1","^1"))
+   ,?assertEqual(false, check("2","^1"))
+   ,?assertEqual(false, check("2.0.0","^1"))
+   ,?assertEqual(false, check("2.0.1","^1"))
+   ,?assertEqual(false, check("2.2.1","^1"))
+    %  ~1       is >=1.0.0 <2.0.0 
+   ,?assertEqual(true, check("1","~1"))
+   ,?assertEqual(true, check("1.0","~1"))
+   ,?assertEqual(true, check("1.0.0","~1"))
+   ,?assertEqual(true, check("1.1","~1"))
+   ,?assertEqual(true, check("1.1.1","~1"))
+   ,?assertEqual(true, check("1.2.3","~1"))
+   ,?assertEqual(false, check("2.0.0","~1"))
+   ,?assertEqual(false, check("2.1.0","~1"))
+   ,?assertEqual(false, check("2.2.3","~1"))
+   ,?assertEqual(false, check("0.0.3","~1"))
+   ,?assertEqual(false, check("0.1.0","~1"))
+   ,?assertEqual(false, check("0.2.3","~1"))
+    %   1.x     is >=1.0.0 <2.0.0 
+   ,?assertEqual(true, check("1.0.0","1.x"))
+   ,?assertEqual(true, check("1.0.2","1.x"))
+   ,?assertEqual(true, check("1.1.0","1.x"))
+   ,?assertEqual(true, check("1.1.2","1.x"))
+   ,?assertEqual(true, check("1.30.2","1.x"))
+   ,?assertEqual(false, check("2.0.0","1.x"))
+   ,?assertEqual(false, check("2.1.0","1.x"))
+   ,?assertEqual(false, check("2.2.1","1.x"))
+    %   1.*     is >=1.0.0 <2.0.0 
+   ,?assertEqual(true, check("1.0.0","1.*"))
+   ,?assertEqual(true, check("1.0.2","1.*"))
+   ,?assertEqual(true, check("1.1.0","1.*"))
+   ,?assertEqual(true, check("1.1.2","1.*"))
+   ,?assertEqual(true, check("1.30.2","1.*"))
+   ,?assertEqual(false, check("2.0.0","1.*"))
+   ,?assertEqual(false, check("2.1.0","1.*"))
+   ,?assertEqual(false, check("2.2.1","1.*"))
+    %   1       is >=1.0.0 <2.0.0 
+   ,?assertEqual(true, check("1.0.0","1"))
+   ,?assertEqual(true, check("1.0.2","1"))
+   ,?assertEqual(true, check("1.1.0","1"))
+   ,?assertEqual(true, check("1.1.2","1"))
+   ,?assertEqual(true, check("1.30.2","1"))
+   ,?assertEqual(false, check("2.0.0","1"))
+   ,?assertEqual(false, check("2.1.0","1"))
+   ,?assertEqual(false, check("2.2.1","1"))
+    %   *       any version 
+   ,?assertEqual(true, check("1","*"))
+   ,?assertEqual(true, check("1.1","*"))
+   ,?assertEqual(true, check("1.2.3","*"))
+   ,?assertEqual(true, check("100.2.3","*"))
+    %   x       any version
+   ,?assertEqual(true, check("1","x"))
+   ,?assertEqual(true, check("1.1","x"))
+   ,?assertEqual(true, check("1.2.3","x"))
+   ,?assertEqual(true, check("100.2.3","x"))
+   ,ok.
+
+check_comb_test() ->
     ?assertEqual(true,  check("1.4","~1.2 || 1.4"))
-   ,?assertEqual(false, check("1.4.1","~1.2 || 1.4"))
+   ,?assertEqual(true, check("1.4.1","~1.2 || 1.4"))
    ,?assertEqual(true,  check("1.2.7","~1.2 || 1.4"))
    ,?assertEqual(true,  check("1.4.0","~1.2 || 1.4"))
-   ,?assertEqual(false, check("1.4.2","~1.2 || 1.4"))
+   ,?assertEqual(true, check("1.4.2","~1.2 || 1.4"))
+   ,?assertEqual(false, check("1.5.0","~1.2 || 1.4"))
    ,?assertEqual(true,  check("1.4.3","~1.2 || ~1.4"))
    ,?assertEqual(false, check("1.5","~1.2 || ~1.4"))
    ,?assertEqual(false, check("1.5.1","~1.2 || ~1.4"))
