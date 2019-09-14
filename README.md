@@ -6,6 +6,8 @@
 
 Implementation is Erlang/OTP friendly by allowing use of old release version syntax.
 
+Available on [hex.pm](https://hex.pm/packages/samovar) .
+
 ## Supported syntaxes
 
 ### Simple range
