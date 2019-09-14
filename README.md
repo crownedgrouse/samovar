@@ -1,4 +1,4 @@
-# [WIP] samovar
+# samovar [![Build Status](https://travis-ci.org/crownedgrouse/samovar.svg?branch=master)](https://travis-ci.org/crownedgrouse/samovar) #
 
 ## Overview
 
@@ -189,5 +189,6 @@ samovar:build(Version :: string()) -> Build :: string().
 "build001"
 
 ```
+
 
 
