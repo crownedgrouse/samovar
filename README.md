@@ -36,7 +36,7 @@ Available on [hex.pm](https://hex.pm/packages/samovar) .
 
 ### Hyphenated range
 ```
-1.2.3 - 2.3.0   is >=1.2.3 <=2.3.4
+1.2.3 - 2.3.0   is >=1.2.3 <=2.3.0
                 Partial right
                 When the right is partial, missing pieces are assumed to be x (2.3 = 2.3.x).
 1.2.3 - 2.3     is >=1.2.3 <2.4.0
