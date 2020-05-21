@@ -469,38 +469,41 @@ simple_range_translate(_X, _Y)
 
 parse_range(V) when is_list(V) -> 
   try
-   case string:tokens(V, " ") of
-      [Left, "-", Right]  
-        -> 
-           {ok, #version{major = Major, minor = Minor, patch = Patch} = X} = parse(Right),
-           case X of
-               X when (Patch =/= "")
-                  -> parse_range(io_lib:format(">=~ts <=~ts", [Left, Right]));
-               % Partial right
-               X when (Minor == ""),(Patch == "")
-                  -> parse_range(io_lib:format(">=~ts <~ts.~ts.~ts", [Left, erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"]));
-               X when (Patch == "")
-                  -> parse_range(io_lib:format(">=~ts <~ts.~ts.~ts", [Left, Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1), "0"]))
+   case string:tokens(V, "||") of 
+     [Left | T] when (T =/= []) -> 
+         {'or', parse_range(trim(Left)), parse_range(lists:flatten(lists:join("||", T)))} ;
+     [V] -> 
+       case string:tokens(V, "-") of
+          [Left_, Right_]   
+            -> 
+               Left  = rtrim(Left_),
+               Right = ltrim(Right_),
+               {ok, #version{major = Major, minor = Minor, patch = Patch} = X} = parse(Right),
+               case X of
+                   X when (Patch =/= "")
+                      -> parse_range(io_lib:format(">=~ts <=~ts", [Left, Right]));
+                   % Partial right
+                   X when (Minor == ""),(Patch == "")
+                      -> parse_range(io_lib:format(">=~ts <~ts.~ts.~ts", [Left, erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"]));
+                   X when (Patch == "")
+                      -> parse_range(io_lib:format(">=~ts <~ts.~ts.~ts", [Left, Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1), "0"]))
 
-           end ;
-      [Left, "||", Right] -> 
-          {ok, L1, R1} = simple_range(Left),
-          {ok, L2, R2} = simple_range(Right),
-          {'or', {'and', L1, R1}, {'and', L2, R2}};
-      [Left, "||" | Right] -> 
-          {ok, L1, R1} = simple_range(Left),
-          R = parse_range(lists:flatten(join(" ", Right))),
-          {'or', {'and', L1, R1}, R};
-      [Left, Right]       -> 
-          {ok, L1, R1} = simple_range(Left),
-          {ok, L2, R2} = simple_range(Right),
-          {'and', {'and', L1, R1}, {'and', L2, R2}};
-      [Single]            -> 
-          {ok, L1, R1} = simple_range(Single),
-          {'and', L1, R1}
-   end
+               end ;
+          [V] -> 
+               case string:tokens(V, " ") of
+                  [Left, Right] -> 
+                      {ok, L1, R1} = simple_range(rtrim(Left)),
+                      {ok, L2, R2} = simple_range(ltrim(Right)),
+                      {'and', {'and', L1, R1}, {'and', L2, R2}};
+                  [Single] -> 
+                      {ok, L1, R1} = simple_range(trim(Single)),
+                      {'and', L1, R1}
+               end
+          end
+      end
   catch 
-    _:_E ->  %erlang:display({error, _E}),
+    _:_E:_S ->  
+      erlang:display({error, _E, _S}), 
       throw(invalid_range)
   end.
 
@@ -532,21 +535,32 @@ supchar(S, C) -> case S of
                  end.
 
 %%-------------------------------------------------------------------------
+%% @doc trim functions
+%% @end
+%%-------------------------------------------------------------------------
+ltrim([32  | T]) -> ltrim(T) ;
+ltrim(X) -> X.
+
+rtrim(X) -> lists:reverse(ltrim(lists:reverse(X))).
+
+trim(X) -> rtrim(ltrim(X)).
+
+%%-------------------------------------------------------------------------
 %% @doc join function
 %%      string:join is available since 19.0 only
 %% @end
 %%-------------------------------------------------------------------------
--spec join(Sep, List1) -> List2 when
-      Sep :: T,
-      List1 :: [T],
-      List2 :: [T],
-      T :: term().
+% -spec join(Sep, List1) -> List2 when
+%       Sep :: T,
+%       List1 :: [T],
+%       List2 :: [T],
+%       T :: term().
 
-join(_Sep, []) -> [];
-join(Sep, [H|T]) -> [H|join_prepend(Sep, T)].
+% join(_Sep, []) -> [];
+% join(Sep, [H|T]) -> [H|join_prepend(Sep, T)].
 
-join_prepend(_Sep, []) -> [];
-join_prepend(Sep, [H|T]) -> [Sep,H|join_prepend(Sep,T)].
+% join_prepend(_Sep, []) -> [];
+% join_prepend(Sep, [H|T]) -> [Sep,H|join_prepend(Sep,T)].
 
 %%-------------------------------------------------------------------------
 %% @doc Safe conversion of list to integer
@@ -650,10 +664,10 @@ parse_range_test() ->
    ,?assertEqual({'or',{'and',{">=",lowest},{"<","11","0","0"}},
                        {'and',{">","13","0","0"},{"<=",highest}}},
                  parse_range("<11 || >13"))
-   ,?assertEqual({'or',{'and',{">=",lowest},{"<","11","0","0"}},
-                       {'or',{'and',{">","13","0","0"},{"<=",highest}},
-                             {'and',{'and',{">=","12","3","0"},{"<=",highest}},
-                                    {'and',{">=",lowest},{"<","12","4","0"}}}}},
+   ,?assertEqual({'or', {'and',{">=",lowest},{"<","11","0","0"}},
+                        {'or',{'and',{">","13","0","0"},{"<=",highest}},
+                              {'and',{'and',{">=","12","3","0"},{"<=",highest}},
+                                     {'and',{">=",lowest},{"<","12","4","0"}}}}},
                  parse_range("<11 || >13 || 12.3.x"))
    ,ok.
 
@@ -836,6 +850,10 @@ check_comb_test() ->
    ,?assertEqual(false, check("1.4.3",">1.2  <=1.4"))
    ,?assertEqual(true,  check("R16B03-1",">R16B  <=17.1"))
    ,?assertEqual(true,  check("R16B03-1",">=R16B03  <=17.1"))
+   ,?assertEqual(false, check("1.4.1",">=1.0 <=1.3 || >=1.5 <=1.8"))
+   ,?assertEqual(true, check("1.2.1",">=1.0 <=1.3 || >=1.5 <=1.8"))
+   ,?assertEqual(true, check("1.6",">=1.0 <=1.3 || >=1.5 <=1.8"))
+   ,?assertEqual(true, check("2.4.1",">=1.0 <=1.3 || >=1.5 <=1.8 || >2.3"))
    ,ok.
 
 misc_test() ->    
