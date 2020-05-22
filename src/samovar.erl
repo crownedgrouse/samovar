@@ -502,8 +502,8 @@ parse_range(V) when is_list(V) ->
           end
       end
   catch 
-    _:_E:_S ->  
-      erlang:display({error, _E, _S}), 
+    _:_E ->  
+      %erlang:display({error, _E}), 
       throw(invalid_range)
   end.
 
