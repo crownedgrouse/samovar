@@ -8,6 +8,13 @@ Implementation is Erlang/OTP friendly by allowing use of old release version syn
 
 Available on [hex.pm](https://hex.pm/packages/samovar) .
 
+## Donations ##
+
+If you find this project useful, and help it to be maintained, please donate to:
+
+    Bitcoin: 1Ep9VoyNtnNiGoXM52V6NwcMh4SZ9bxkAG
+    Ethereum: 0xfac5e46ffe12ec1fc2830d95c22e6583d163d7f9 
+
 ## Supported syntaxes
 
 ### Simple range
