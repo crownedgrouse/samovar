@@ -1,4 +1,4 @@
-# samovar [![Build Status](https://travis-ci.org/crownedgrouse/samovar.svg?branch=master)](https://travis-ci.org/crownedgrouse/samovar) #
+# samovar ![Build status](https://github.com/crownedgrouse/samovar/actions/workflows/erlang.yml/badge.svg) #
 
 ## Overview
 
