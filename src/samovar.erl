@@ -37,6 +37,7 @@
 -export([proplist/1]).
 -export([versionize/1]).
 -export([major/1, minor/1, patch/1, suffix/1, prerelease/1, build/1]).
+-export([major_minor/1, major_minor_patch/1]).
 -export([version/0]).
 
 %% semver regex
@@ -178,8 +179,10 @@ versionize(V)  ->
 %% @doc  Parse semver string
 %% @end
 %%-------------------------------------------------------------------------
--spec parse(string()) -> {ok, tuple()} | {error, atom()}.
+-spec parse(string() | binary()) -> {ok, tuple()} | {error, atom()}.
 
+parse(V) when is_binary(V) ->
+    parse(binary_to_list(V));
 parse(V) when is_list(V) ->
   try
     case re:run(versionize(V), ?SEMVER, [global, {capture, all_but_first, list}, notempty]) of
@@ -227,6 +230,33 @@ proplist(V)
       {ok, R} when is_record(R, version) 
               -> {ok, record_to_proplist(R)}
     end.
+
+
+%%-------------------------------------------------------------------------
+%% @doc  Get major.minor
+%% @return binary()
+%% @end
+%%-------------------------------------------------------------------------
+-spec major_minor(string() | binary()) -> binary() | {error, atom()}.
+major_minor(V) ->
+  case parse(V) of
+    {ok, R} ->
+        iolist_to_binary([R#version.major, ".", R#version.minor]);
+    E -> E
+  end.
+
+%%-------------------------------------------------------------------------
+%% @doc  Get major.minor.patch
+%% @return binary()
+%% @end
+%%-------------------------------------------------------------------------
+-spec major_minor_patch(string() | binary()) -> binary() | {error, atom()}.
+major_minor_patch(V) ->
+  case parse(V) of
+    {ok, R} ->
+        iolist_to_binary([R#version.major, ".", R#version.minor, ".", R#version.patch]);
+    E -> E
+  end.
 
 %%-------------------------------------------------------------------------
 %% @doc  Get major
