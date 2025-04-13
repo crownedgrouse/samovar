@@ -646,13 +646,13 @@ strip_range({'error', E})
 -spec rewrite_elixir(list())  -> list().
 
 rewrite_elixir(S) ->
-    rewrite_elixir_andor(rewrite_elixir_tilde(S)).
+    rewrite_elixir_andorequal(rewrite_elixir_tilde(S)).
 
 
--spec rewrite_elixir_andor(list())  -> list().
+-spec rewrite_elixir_andorequal(list())  -> list().
 
-rewrite_elixir_andor(S) ->
-    re:replace(re:replace(S,"and","",[{return, list}]),"or","||",[{return, list}]) .
+rewrite_elixir_andorequal(S) ->
+    re:replace(re:replace(re:replace(S,"and","",[{return, list}]),"or","||",[{return, list}]),"==","=",[{return, list}]) .
 
 -spec rewrite_elixir_tilde(list())  -> list().
 
@@ -988,8 +988,10 @@ misc_test() ->
     ,ok.
 
 elixir_test() ->
+     ?assertEqual(true, check("2.0.0","== 2.0.0"))
+    ,?assertEqual(false, check("2.0.2","== 2.0.0"))
     %
-     ?assertEqual(true, check("2.0.2","~> 2.0.0"))
+    ,?assertEqual(true, check("2.0.2","~> 2.0.0"))
     ,?assertEqual(true, check("2.0.2",">= 2.0.0 and < 2.1.0"))
     ,?assertEqual(false, check("2.2.1","~> 2.0.0"))
     ,?assertEqual(false, check("2.2.1",">= 2.0.0 and < 2.1.0"))

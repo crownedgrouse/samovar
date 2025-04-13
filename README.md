@@ -11,8 +11,10 @@ Available on [hex.pm](https://hex.pm/packages/samovar) .
 ## Supported syntaxes
 
 SEMVER by itself doesn't describe syntax of versions comparisons. 
-`samovar` use [NPM](https://github.com/npm/node-semver#versions) standard, which is the most commonly used, but since version 1.1 allow [Elixir](https://hexdocs.pm/elixir/Version.html#module-requirements) standard. 
-See [Elixir-dialect](https://github.com/crownedgrouse/samovar/wiki/Elixir-dialect) page for more details.
+`samovar` use : 
+- [NPM](https://github.com/npm/node-semver#versions) standard, by default and target syntax.
+- [Elixir](https://hexdocs.pm/elixir/Version.html#module-requirements) standard, since version 1.1. 
+  - See [Elixir-dialect](https://github.com/crownedgrouse/samovar/wiki/Elixir-dialect) page for more details.
 
 ### Simple range
 ```
