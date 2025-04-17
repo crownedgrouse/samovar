@@ -645,14 +645,34 @@ strip_range({'error', E})
 %%-------------------------------------------------------------------------
 -spec rewrite_elixir(list())  -> list().
 
-rewrite_elixir(S) ->
-    rewrite_elixir_andorequal(rewrite_elixir_tilde(S)).
+rewrite_elixir(S0) ->
+    %erlang:display({input,S0}),
+    S1 = re:replace(S0,"==","=",[{return, list}]),
+    case string:split(S1,"or", all) of
+        L1 when length(L1)>1 ->
+            %erlang:display({l1,L1}),
+            {_, L2} = lists:mapfoldl(fun(X, Acc) -> 
+                LX = string:split(X,"and", all),
+                %erlang:display({lx,LX}),
+                LY = lists:map(fun(Y) -> rewrite_elixir_tilde(Y) end, LX),
+                %erlang:display({ly,LY}),
+                LZ = lists:flatten(lists:join(" ",LY)),
+                %erlang:display({lz,LZ}),
+                {[], Acc ++ [LZ]}
+            end, [], L1),
+            %erlang:display({l2,L2}),
+            L3 = lists:join(" || ",L2),
+            lists:flatten(L3);
+        L1 -> re:replace(rewrite_elixir_tilde(lists:flatten(L1)),"and","",[{return, list}])
+    end.
 
 
--spec rewrite_elixir_andorequal(list())  -> list().
+% -spec rewrite_elixir_andorequal(list())  -> list().
 
-rewrite_elixir_andorequal(S) ->
-    re:replace(re:replace(re:replace(S,"and","",[{return, list}]),"or","||",[{return, list}]),"==","=",[{return, list}]) .
+% rewrite_elixir_andorequal(S) ->
+%     New = re:replace(re:replace(re:replace(S,"and","",[{return, list}]),"or","||",[{return, list}]),"==","=",[{return, list}]),
+%     erlang:display({andorequal,New}),
+%     New.
 
 -spec rewrite_elixir_tilde(list())  -> list().
 
@@ -723,7 +743,10 @@ rewrite_elixir_tilde(S) ->
                     rewrite_elixir_tilde(lists:flatten(New));
                 _E -> % Continuing, will probably fail later
                     S
-            end
+            end;
+    _E -> 
+        %erlang:display({unmatched,_E}),
+        _E
    end.
 
 %%-------------------------------------------------------------------------
@@ -739,6 +762,7 @@ normalize_space(S) ->
     S3 = string:replace(S2, "> ", ">",all),
     S4 = string:replace(S3, "< ", "<",all),
     S5 = string:replace(S4, "~ ", "~",all),
+    %erlang:display({final, lists:flatten(S5)}),
     lists:flatten(S5).
 
 
@@ -1044,6 +1068,14 @@ elixir_test() ->
     %
     ,?assertEqual(false, check("2.1.3","> 2.0 and < 2.1.0"))
     ,?assertEqual(true, check("2.1.3","> 2.0 or < 2.2.0"))
+    %
+    ,?assertEqual(false, check("3.1.1","~> 2.0 or ~> 4.2"))
+    ,?assertEqual(true, check("2.0.5","~> 2.0 or ~> 4.2"))
+    ,?assertEqual(true, check("4.2.5","~> 2.0 or ~> 4.2"))
+    ,?assertEqual(true, check("1.3.0","~> 1.1 and ~> 1.2")) 
+    ,?assertEqual(false,check("1.0.0","~> 1.1 and ~> 1.2"))
+    ,?assertEqual(true,check("1.3.0","~> 1.1 and ~> 1.2"))
+    ,?assertEqual(false,check("2.0.0","~> 1.1 and ~> 1.2"))
    ,ok.
 
 -endif.
