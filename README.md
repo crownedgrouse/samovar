@@ -14,7 +14,7 @@ SEMVER by itself doesn't describe syntax of versions comparisons.
 `samovar` use : 
 - [NPM](https://github.com/npm/node-semver#versions) standard, by default and target syntax.
 - [Elixir](https://hexdocs.pm/elixir/Version.html#module-requirements) standard, since version 1.1. 
-  - See [Elixir-dialect](https://github.com/crownedgrouse/samovar/wiki/Elixir-dialect) page for more details.
+  - See [Elixir-dialect](https://github.com/crownedgrouse/samovar/wiki/Elixir-dialect) Wiki page for more details.
 
 ### Simple range
 ```
