@@ -8,14 +8,11 @@ Implementation is Erlang/OTP friendly by allowing use of old release version syn
 
 Available on [hex.pm](https://hex.pm/packages/samovar) .
 
-## Donations ##
-
-If you find this project useful, and help it to be maintained, please donate to:
-
-    Bitcoin: 1Ep9VoyNtnNiGoXM52V6NwcMh4SZ9bxkAG
-    Ethereum: 0xfac5e46ffe12ec1fc2830d95c22e6583d163d7f9 
-
 ## Supported syntaxes
+
+SEMVER by itself doesn't describe syntax of versions comparisons. 
+`samovar` use [NPM](https://github.com/npm/node-semver#versions) standard, which is the most commonly used, but since version 1.1 allow [Elixir](https://hexdocs.pm/elixir/Version.html#module-requirements) standard. 
+See [Elixir-dialect](https://github.com/crownedgrouse/samovar/wiki/Elixir-dialect) page for more details.
 
 ### Simple range
 ```

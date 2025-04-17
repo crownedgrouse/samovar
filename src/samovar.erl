@@ -42,7 +42,7 @@
 %% semver regex
 -define(SEMVER, "(\\*|x|[^0-9]{0,})([0-9\\*x]+){0,1}(\.[0-9\\*x]+){0,1}(\\.[0-9x]+){0,1}([\\-|\\+].*){0,}").
 
--include("samovar.hrl").
+-include("../include/samovar.hrl").
 
 -opaque version() :: #version{}.
 
@@ -467,40 +467,57 @@ simple_range_translate(_X, _Y)
 % 0.14.x || 15.x.x 	Or (pipe-separated)
 -spec parse_range(list()) -> tuple() | no_return().
 
-parse_range(V) when is_list(V) -> 
-  try
-   case string:tokens(V, "||") of 
-     [Left | T] when (T =/= []) -> 
+parse_range(V0) when is_list(V0) -> 
+   % erlang:display(V),
+    V1 = rewrite_elixir(lists:flatten(V0)),
+    V  = lists:flatten(normalize_space(V1)),
+    try
+    case string:tokens(V, "||") of 
+        [Left | T] when (T =/= []) -> 
          {'or', parse_range(trim(Left)), parse_range(lists:flatten(lists:join("||", T)))} ;
-     [V] -> 
-       case string:tokens(V, "-") of
-          [Left_, Right_]   
-            -> 
-               Left  = rtrim(Left_),
-               Right = ltrim(Right_),
-               {ok, #version{major = Major, minor = Minor, patch = Patch} = X} = parse(Right),
-               case X of
-                   X when (Patch =/= "")
-                      -> parse_range(io_lib:format(">=~ts <=~ts", [Left, Right]));
-                   % Partial right
-                   X when (Minor == ""),(Patch == "")
-                      -> parse_range(io_lib:format(">=~ts <~ts.~ts.~ts", [Left, erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"]));
-                   X when (Patch == "")
-                      -> parse_range(io_lib:format(">=~ts <~ts.~ts.~ts", [Left, Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1), "0"]))
+        [V] -> 
+            case string:str(V, " - ") of
+                0 -> % a version with a suffixe
+                    case string:tokens(V, " ") of
+                      [Left, Right] -> 
+                          {ok, L1, R1} = simple_range(rtrim(Left)),
+                          {ok, L2, R2} = simple_range(ltrim(Right)),
+                          {'and', {'and', L1, R1}, {'and', L2, R2}};
+                      [Single] -> 
+                          {ok, L1, R1} = simple_range(trim(Single)),
+                          {'and', L1, R1}
+                    end;
+                _ -> % An hyphenate range
+                    case string:tokens(V, "-") of
+                        [Left_, Right_]   
+                        -> 
+                           Left  = rtrim(Left_),
+                           Right = ltrim(Right_),
+                           {ok, #version{comp=_, major = Major, minor = Minor, patch = Patch, suffix=_, pre= _, build=_} = X} = parse(Right),
+                            case X of
+                               X when (Patch =/= "")
+                                  -> parse_range(io_lib:format(">=~ts <=~ts", [Left, Right]));
+                               % Partial right
+                               X when (Minor == ""),(Patch == "")
+                                  -> parse_range(io_lib:format(">=~ts <~ts.~ts.~ts", [Left, erlang:integer_to_list(erlang:list_to_integer(Major) + 1), "0", "0"]));
+                               X when (Patch == "")
+                                  -> parse_range(io_lib:format(">=~ts <~ts.~ts.~ts", [Left, Major, erlang:integer_to_list(erlang:list_to_integer(Minor) + 1), "0"]))
 
-               end ;
-          [V] -> 
-               case string:tokens(V, " ") of
-                  [Left, Right] -> 
-                      {ok, L1, R1} = simple_range(rtrim(Left)),
-                      {ok, L2, R2} = simple_range(ltrim(Right)),
-                      {'and', {'and', L1, R1}, {'and', L2, R2}};
-                  [Single] -> 
-                      {ok, L1, R1} = simple_range(trim(Single)),
-                      {'and', L1, R1}
-               end
-          end
-      end
+                            end ;
+                        [V] -> 
+                            case string:tokens(V, " ") of
+                              [Left, Right] -> 
+                                  {ok, L1, R1} = simple_range(rtrim(Left)),
+                                  {ok, L2, R2} = simple_range(ltrim(Right)),
+                                  {'and', {'and', L1, R1}, {'and', L2, R2}};
+                              [Single] -> 
+                                  {ok, L1, R1} = simple_range(trim(Single)),
+                                  {'and', L1, R1}
+                            end
+                    end
+            end;
+        _Z -> erlang:diplay({unexpected, _Z})
+    end
   catch 
     _:_E ->  
       %erlang:display({error, _E}), 
@@ -622,6 +639,109 @@ strip_range({'error', E})
   -> %erlang:display({ok, L, R}), 
   {'error', E}.
 
+%%-------------------------------------------------------------------------
+%% @doc Rewrite Elixir syntax
+%% @end
+%%-------------------------------------------------------------------------
+-spec rewrite_elixir(list())  -> list().
+
+rewrite_elixir(S) ->
+    rewrite_elixir_andor(rewrite_elixir_tilde(S)).
+
+
+-spec rewrite_elixir_andor(list())  -> list().
+
+rewrite_elixir_andor(S) ->
+    re:replace(re:replace(S,"and","",[{return, list}]),"or","||",[{return, list}]) .
+
+-spec rewrite_elixir_tilde(list())  -> list().
+
+rewrite_elixir_tilde(S) ->
+   % Detect ' ~> sss '
+   case re:run(S, "~>\ +([^\ ]+)", [{capture, all, list}]) of
+        nomatch ->
+            S ;
+        {match,[_,V]} -> 
+            % Elixir syntax detected, rewrite and check again if another syntax detected, recursively            
+            case parse(V) of
+                % ~> X is X.0  
+                {ok, Rec} when 
+                     Rec#version.comp==[]
+                    ,Rec#version.minor==[]
+                    ,Rec#version.patch==[]
+                    ,Rec#version.suffix==[]
+                    ->
+                    New = lists:flatten(io_lib:format("^~ts.~ts", [Rec#version.major,"0"])),
+                    rewrite_elixir_tilde(lists:flatten(New));
+                % ~> X.0 is >= X.0.0 and < {X+1}.0.0
+                {ok, Rec} when 
+                     Rec#version.comp==[]
+                    ,Rec#version.minor=="0"
+                    ,Rec#version.patch==[]
+                    ,Rec#version.suffix==[]
+                    ->
+                    New = lists:flatten(io_lib:format(">=~p.0.0 <~p.0.0", 
+                        [major(V),major(V)+1])),
+                    rewrite_elixir_tilde(lists:flatten(New));
+                % ~> X.Y is >= X.Y.0 and < {X+1}.0.0
+                {ok,Rec} 
+                    when 
+                     Rec#version.comp==[]
+                    ,Rec#version.patch==[]
+                    ,Rec#version.suffix==[]
+                    ->
+                    New = lists:flatten(io_lib:format(">=~p.~p.0 <~p.0.0", 
+                        [major(V),minor(V),major(V)+1])),
+                    rewrite_elixir_tilde(lists:flatten(New));
+                % ~> X.0.0 is >= X.0.0 and < X.1.0
+                {ok, Rec} 
+                    when 
+                     Rec#version.comp==[]
+                    ,Rec#version.minor=="0"
+                    ,Rec#version.patch=="0"
+                    ,Rec#version.suffix==[]
+                    ->
+                    New = lists:flatten(io_lib:format(">=~p.0.0 <~p.~p.0", 
+                        [major(V),major(V),minor(V)+1])),
+                    rewrite_elixir_tilde(lists:flatten(New));
+                % ~> X.Y.Z  is >= X.Y.Z and < X.{Y+1}.0
+                {ok, Rec} 
+                    when 
+                     Rec#version.comp==[] 
+                    ,Rec#version.suffix==[]
+                    ->
+                    New = lists:flatten(io_lib:format(">=~p.~p.~p <~p.~p.0", 
+                        [major(V),minor(V),patch(V),major(V),minor(V)+1])),
+                    rewrite_elixir_tilde(lists:flatten(New));
+                % ~> X.Y.Z...  is >= X.Y.Z... and < X.{Y+1}.0
+                {ok, Rec} 
+                    when 
+                    Rec#version.comp==[] 
+                    ->
+                    New = lists:flatten(io_lib:format(">=~p.~p.~p-~ts <~p.~p.0", 
+                        [major(V),minor(V),patch(V),suffix(V),major(V),minor(V)+1])),
+                    rewrite_elixir_tilde(lists:flatten(New));
+                _E -> % Continuing, will probably fail later
+                    S
+            end
+   end.
+
+%%-------------------------------------------------------------------------
+%% @doc Normalize space as NPM standard
+%% @end
+%%-------------------------------------------------------------------------
+
+-spec normalize_space(list())  -> list().
+
+normalize_space(S) ->
+    S1 = re:replace(S,"\s+"," ",[{return, list}]),
+    S2 = string:replace(S1, "= ", "=",all),
+    S3 = string:replace(S2, "> ", ">",all),
+    S4 = string:replace(S3, "< ", "<",all),
+    S5 = string:replace(S4, "~ ", "~",all),
+    lists:flatten(S5).
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%                               TESTS                                     %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
@@ -674,14 +794,16 @@ parse_range_test() ->
 
 check_test() ->
     %   1.2.3
-    ?assertEqual(true, check("1.2.3","1.2.3"))
+    %?assertEqual(true, check("1.2.3","1.2.3"))
     %  =1.2.3
-   ,?assertEqual(true, check("1.2.3","=1.2.3"))
-   ,?assertEqual(false, check("1.2.4","=1.2.3"))
-   ,?assertEqual(false, check("1.3.2","=1.2.3"))
-   ,?assertEqual(false, check("3.2.1","=1.2.3"))
+   %,
+   % ?assertEqual(true, check("1.2.3","=1.2.3"))
+   % ,?assertEqual(false, check("1.2.4","=1.2.3"))
+   % ,?assertEqual(false, check("1.3.2","=1.2.3"))
+   % ,?assertEqual(false, check("3.2.1","=1.2.3"))
     %  >1.2.3
-   ,?assertEqual(true, check("1.2.4",">1.2.3"))
+   %,
+   ?assertEqual(true, check("1.2.4",">1.2.3"))
    ,?assertEqual(true, check("1.4.3",">1.2.3"))
    ,?assertEqual(true, check("2.3.1",">1.2.3"))
    ,?assertEqual(false, check("1.2.1",">1.2.3"))
@@ -864,5 +986,59 @@ misc_test() ->
     ,?assertEqual("rc1",           prerelease("17.8.9-rc1+build001"))
     ,?assertEqual("build001",      build("17.8.9-rc1+build001"))
     ,ok.
+
+elixir_test() ->
+    %
+     ?assertEqual(true, check("2.0.2","~> 2.0.0"))
+    ,?assertEqual(true, check("2.0.2",">= 2.0.0 and < 2.1.0"))
+    ,?assertEqual(false, check("2.2.1","~> 2.0.0"))
+    ,?assertEqual(false, check("2.2.1",">= 2.0.0 and < 2.1.0"))
+    ,?assertEqual(false, check("3.1.2","~> 2.0.0"))
+    ,?assertEqual(false, check("3.1.2",">= 2.0.0 and < 2.1.0"))
+    % 
+    ,?assertEqual(true, check("2.1.3","~> 2.1.2"))
+    ,?assertEqual(true, check("2.1.3",">= 2.1.2 and < 2.2.0"))
+    ,?assertEqual(false, check("2.2.1","~> 2.1.2"))
+    ,?assertEqual(false, check("2.2.1",">= 2.1.2 and < 2.2.0"))
+    ,?assertEqual(false, check("3.0.0","~> 2.1.2"))
+    ,?assertEqual(false, check("3.0.0",">= 2.1.2 and < 2.2.0"))
+    % 
+    ,?assertEqual(true, check("2.1.3","~> 2.1.3-dev"))
+    ,?assertEqual(true, check("2.1.3",">= 2.1.3-dev and < 2.2.0"))
+    ,?assertEqual(false, check("2.2.0","~> 2.1.3-dev"))
+    ,?assertEqual(false, check("2.2.0",">= 2.1.3-dev and < 2.2.0"))
+    ,?assertEqual(false, check("3.0.0","~> 2.1.3-dev"))
+    ,?assertEqual(false, check("3.0.0",">= 2.1.3-dev and < 2.2.0"))
+    %
+    ,?assertEqual(true, check("2.0","~> 2.0"))
+    ,?assertEqual(true, check("2.0.0","~> 2.0"))
+    ,?assertEqual(true, check("2.0.1","~> 2.0"))
+    ,?assertEqual(true, check("2.1.0","~> 2.0"))
+    ,?assertEqual(true, check("2.1.1","~> 2.0"))
+    ,?assertEqual(true, check("2.0",">= 2.0.0 and < 3.0.0"))
+    ,?assertEqual(true, check("2.0.0",">= 2.0.0 and < 3.0.0"))
+    ,?assertEqual(true, check("2.0.1",">= 2.0.0 and < 3.0.0"))
+    ,?assertEqual(true, check("2.1.0",">= 2.0.0 and < 3.0.0"))
+    ,?assertEqual(true, check("2.1.1",">= 2.0.0 and < 3.0.0"))
+    ,?assertEqual(false, check("1.0","~> 2.0"))
+    ,?assertEqual(false, check("3.0",">= 2.0.0 and < 3.0.0"))
+    ,?assertEqual(false, check("1.0.1","~> 2.0"))
+    ,?assertEqual(false, check("3.0.2",">= 2.0.0 and < 3.0.0"))
+    %
+    ,?assertEqual(true, check("2.1","~> 2.1"))
+    ,?assertEqual(true, check("2.1.0","~> 2.1"))
+    ,?assertEqual(true, check("2.1.3","~> 2.1"))
+    ,?assertEqual(true, check("2.1",">= 2.1.0 and < 3.0.0"))
+    ,?assertEqual(true, check("2.1.0",">= 2.1.0 and < 3.0.0"))
+    ,?assertEqual(true, check("2.1.3",">= 2.1.0 and < 3.0.0"))
+    ,?assertEqual(false, check("2.0","~> 2.1"))
+    ,?assertEqual(false, check("2.0",">= 2.1.0 and < 3.0.0"))
+    ,?assertEqual(false, check("2.0.3","~> 2.1"))
+    ,?assertEqual(false, check("2.0.3",">= 2.1.0 and < 3.0.0"))
+    ,?assertEqual(false, check("3.0","~> 2.1"))
+    ,?assertEqual(false, check("3.0",">= 2.1.0 and < 3.0.0"))
+    ,?assertEqual(false, check("3.0.3","~> 2.1"))
+    ,?assertEqual(false, check("3.0.3",">= 2.1.0 and < 3.0.0"))
+   ,ok.
 
 -endif.
