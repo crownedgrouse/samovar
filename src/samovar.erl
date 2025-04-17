@@ -1041,6 +1041,9 @@ elixir_test() ->
     ,?assertEqual(false, check("3.0",">= 2.1.0 and < 3.0.0"))
     ,?assertEqual(false, check("3.0.3","~> 2.1"))
     ,?assertEqual(false, check("3.0.3",">= 2.1.0 and < 3.0.0"))
+    %
+    ,?assertEqual(false, check("2.1.3","> 2.0 and < 2.1.0"))
+    ,?assertEqual(true, check("2.1.3","> 2.0 or < 2.2.0"))
    ,ok.
 
 -endif.
