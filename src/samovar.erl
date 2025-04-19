@@ -818,16 +818,15 @@ parse_range_test() ->
 
 check_test() ->
     %   1.2.3
-    %?assertEqual(true, check("1.2.3","1.2.3"))
+   ?assertEqual(true, check("1.2.3","1.2.3"))
     %  =1.2.3
-   %,
-   % ?assertEqual(true, check("1.2.3","=1.2.3"))
-   % ,?assertEqual(false, check("1.2.4","=1.2.3"))
-   % ,?assertEqual(false, check("1.3.2","=1.2.3"))
-   % ,?assertEqual(false, check("3.2.1","=1.2.3"))
+   ,?assertEqual(true, check("1.2.3","=1.2.3"))
+   ,?assertEqual(false, check("1.2.4","=1.2.3"))
+   ,?assertEqual(false, check("1.3.2","=1.2.3"))
+   ,?assertEqual(false, check("3.2.1","=1.2.3"))
     %  >1.2.3
    %,
-   ?assertEqual(true, check("1.2.4",">1.2.3"))
+   ,?assertEqual(true, check("1.2.4",">1.2.3"))
    ,?assertEqual(true, check("1.4.3",">1.2.3"))
    ,?assertEqual(true, check("2.3.1",">1.2.3"))
    ,?assertEqual(false, check("1.2.1",">1.2.3"))
