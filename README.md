@@ -8,6 +8,8 @@ Implementation is Erlang/OTP friendly by allowing use of old release version syn
 
 Available on [hex.pm](https://hex.pm/packages/samovar) .
 
+See [Wiki](https://github.com/crownedgrouse/samovar/wiki) for tips to create your own functions (greater than, split a list of versions, get best version matching a requirement among a list ...) 
+
 ## Supported syntaxes
 
 SEMVER by itself doesn't describe syntax of versions comparisons. 
