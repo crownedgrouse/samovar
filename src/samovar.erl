@@ -295,7 +295,7 @@ build(V) ->
 -spec simple_range(list()) -> tuple().
 
 simple_range(X) -> 
-   case catch parse(X) of
+   case try parse(X) catch _:Err -> Err end of
       {error, E} -> 
         {error, E};
       {ok, M}    -> 
